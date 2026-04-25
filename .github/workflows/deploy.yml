@@ -12,6 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Injeta credenciais
+        run: |
+          sed -i 's/ANTHROPIC_KEY_PLACEHOLDER/${{ secrets.ANTHROPIC_API_KEY }}/g' workflow/mia.json
+
       - name: Envia workflow para n8n
         run: |
           curl -s -X PUT "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}" \
