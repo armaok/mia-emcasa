@@ -8,7 +8,7 @@
         "responseMode": "lastNode",
         "options": {}
       },
-      "name": "Webhook Evolution1",
+      "name": "Webhook Evolution",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [-6304, 144],
@@ -76,9 +76,9 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst messageType = Object.keys(body.data.message || {})[0];\nif (!messageType || messageType === 'protocolMessage' || messageType === 'reactionMessage') { return []; }\nconst remoteJid = body.data.key.remoteJid || '';\nconst phone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');\nconst message = body.data.message?.conversation || body.data.message?.extendedTextMessage?.text || '';\nconst instance = body.instance || 'teste';\nconst messageId = body.data.key.id || '';\nreturn [{ json: { phone, message, instance, messageId } }];"
+        "jsCode": "const body = $input.first().json.body;\nconst messageType = Object.keys(body.data.message || {})[0];\nif (!messageType || messageType === 'protocolMessage' || messageType === 'reactionMessage') { return []; }\nconst remoteJid = body.data.key.remoteJid || '';\nconst phone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');\nconst instance = body.instance || 'teste';\nconst messageId = body.data.key.id || '';\nconst isAudio = !!(body.data.message?.audioMessage || body.data.message?.pttMessage);\nconst message = body.data.message?.conversation || body.data.message?.extendedTextMessage?.text || '';\nreturn [{ json: { phone, message, instance, messageId, isAudio } }];"
       },
-      "name": "Extrai texto1",
+      "name": "Extrai texto",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-5840, 144],
@@ -90,7 +90,7 @@
         "query": "SELECT historico, last_message, last_message_at, last_message_id FROM conversas_mia WHERE phone = '{{ $json.phone }}' LIMIT 1",
         "options": {}
       },
-      "name": "Busca histórico1",
+      "name": "Busca histórico",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
       "position": [-5600, 144],
@@ -104,7 +104,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const phone = $('Extrai texto1').first().json.phone;\nconst message = $('Extrai texto1').first().json.message;\nconst messageId = $('Extrai texto1').first().json.messageId || '';\nif (!message || message.trim() === '') { return []; }\nlet historico = [];\nlet lastMessage = '';\nlet lastMessageAt = null;\nlet lastMessageId = '';\ntry {\n  const rows = $('Busca histórico1').all();\n  if (rows.length > 0 && rows[0].json.historico) {\n    historico = JSON.parse(rows[0].json.historico);\n    lastMessage = rows[0].json.last_message || '';\n    lastMessageAt = rows[0].json.last_message_at ? new Date(rows[0].json.last_message_at) : null;\n    lastMessageId = rows[0].json.last_message_id || '';\n  }\n} catch(e) { historico = []; }\nif (messageId && messageId === lastMessageId) { return []; }\nconst agora = new Date();\nconst diff = lastMessageAt ? (agora - lastMessageAt) / 1000 : 999;\nif (message === lastMessage && diff < 30) { return []; }\nhistorico = historico.filter(m => m.content && m.content.trim() !== '');\nhistorico.push({ role: 'user', content: message });\nreturn [{ json: { phone, message, messageId, historico } }];"
+        "jsCode": "const phone = $('Extrai texto').first().json.phone;\nconst message = $('Extrai texto').first().json.message;\nconst messageId = $('Extrai texto').first().json.messageId || '';\nif (!message || message.trim() === '') { return []; }\nlet historico = [];\nlet lastMessage = '';\nlet lastMessageAt = null;\nlet lastMessageId = '';\ntry {\n  const rows = $('Busca histórico').all();\n  if (rows.length > 0 && rows[0].json.historico) {\n    historico = JSON.parse(rows[0].json.historico);\n    lastMessage = rows[0].json.last_message || '';\n    lastMessageAt = rows[0].json.last_message_at ? new Date(rows[0].json.last_message_at) : null;\n    lastMessageId = rows[0].json.last_message_id || '';\n  }\n} catch(e) { historico = []; }\nif (messageId && messageId === lastMessageId) { return []; }\nconst agora = new Date();\nconst diff = lastMessageAt ? (agora - lastMessageAt) / 1000 : 999;\nif (message === lastMessage && diff < 30) { return []; }\nhistorico = historico.filter(m => m.content && m.content.trim() !== '');\nhistorico.push({ role: 'user', content: message });\nreturn [{ json: { phone, message, messageId, historico } }];"
       },
       "name": "Monta contexto",
       "type": "n8n-nodes-base.code",
@@ -135,10 +135,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 500, \"system\": \"Você é MIA, assistente virtual da Dra. Vanessa Okamura da Em Casa Vet — serviço de veterinária domiciliar em Londrina, Cambé e Ibiporã.\\n\\nSeu papel é receber tutores quando a Dra. Vanessa está em atendimento.\\n\\nTom: caloroso, empático. NÃO use markdown, NÃO use #, NÃO use **. Escreva em texto simples com emojis moderados.\\n\\nAo receber a primeira mensagem, apresente-se brevemente e pergunte o nome do tutor.\\n\\nColete em ordem, UMA pergunta por vez:\\n1. Nome do tutor\\n2. Nome do animal\\n3. Espécie (gato ou cachorro)\\n4. Idade do animal\\n5. O que está acontecendo\\n\\nQuando tiver todos os 5 dados, responda EXATAMENTE:\\n[TRIAGEM_COMPLETA]\\nTutor: {nome}\\nAnimal: {nome}\\nEspécie: {espécie}\\nIdade: {idade}\\nSituação: {resumo}\", \"messages\": {{ JSON.stringify($json.historico) }}}",
+        "jsonBody": "={\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 500, \"system\": \"Você é MIA, assistente virtual da Dra. Vanessa Okamura da Em Casa Vet — serviço de veterinária domiciliar em Londrina, Cambé e Ibiporã.\\n\\nSeu papel é receber tutores quando a Dra. Vanessa está em atendimento.\\n\\nTom: caloroso, empático. NÃO use markdown, NÃO use #, NÃO use **. Escreva em texto simples com emojis moderados.\\n\\nAo receber a primeira mensagem, apresente-se brevemente e pergunte o nome do tutor.\\n\\nColete em ordem, UMA pergunta por vez:\\n1. Nome do tutor\\n2. Nome do animal\\n3. Espécie (gato ou cachorro)\\n4. Idade do animal\\n5. O que está acontecendo\\n\\nQuando tiver todos os 5 dados, responda EXATAMENTE assim e nada mais:\\n[TRIAGEM_COMPLETA]\\nTutor: {nome}\\nAnimal: {nome do animal}\\nEspécie: {espécie}\\nIdade: {idade}\\nSituação: {resumo da situação}\", \"messages\": {{ JSON.stringify($json.historico) }}}",
         "options": {}
       },
-      "name": "Chama Claude API1",
+      "name": "Chama Claude API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [-5120, 144],
@@ -146,9 +146,9 @@
     },
     {
       "parameters": {
-        "jsCode": "const resposta = $input.first().json.content[0].text;\nconst phone = $('Monta contexto').first().json.phone;\nconst message = $('Monta contexto').first().json.message;\nconst messageId = $('Monta contexto').first().json.messageId;\nconst historico = $('Monta contexto').first().json.historico;\n\nhistorico.push({ role: 'assistant', content: resposta });\n\nreturn [{ json: { resposta, phone, message, messageId, historico } }];"
+        "jsCode": "const resposta = $input.first().json.content[0].text;\nconst phone = $('Monta contexto').first().json.phone;\nconst message = $('Monta contexto').first().json.message;\nconst messageId = $('Monta contexto').first().json.messageId;\nconst historico = $('Monta contexto').first().json.historico;\nhistorico.push({ role: 'assistant', content: resposta });\nreturn [{ json: { resposta, phone, message, messageId, historico } }];"
       },
-      "name": "Extrai resposta1",
+      "name": "Extrai resposta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-4880, 144],
@@ -160,7 +160,7 @@
         "query": "INSERT INTO conversas_mia (phone, historico, last_message, last_message_id, last_message_at, updated_at) VALUES ('{{ $json.phone }}', '{{ JSON.stringify($json.historico) }}', '{{ $json.message }}', '{{ $json.messageId }}', NOW(), NOW()) ON CONFLICT (phone) DO UPDATE SET historico = EXCLUDED.historico, last_message = EXCLUDED.last_message, last_message_id = EXCLUDED.last_message_id, last_message_at = EXCLUDED.last_message_at, updated_at = NOW()",
         "options": {}
       },
-      "name": "Salva histórico1",
+      "name": "Salva histórico",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
       "position": [-4640, 144],
@@ -196,7 +196,7 @@
         },
         "options": {}
       },
-      "name": "Triagem completa?1",
+      "name": "Triagem completa?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [-4400, 144],
@@ -204,27 +204,13 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://evo.emcasa.vet/message/sendText/teste",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "emcasa2024"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\"number\": \"554399590122\", \"textMessage\": {\"text\": \"🐾 Nova triagem pela MIA:\\n\\n{{ $('Extrai resposta1').first().json.resposta.replace('[TRIAGEM_COMPLETA]', '').trim() }}\"}}",
-        "options": {}
+        "jsCode": "const resposta = $('Extrai resposta').first().json.resposta;\nconst phone = $('Extrai resposta').first().json.phone;\nconst triagem = resposta.replace('[TRIAGEM_COMPLETA]', '').trim();\nconst texto = '🐾 Nova triagem pela MIA:\\n\\n' + triagem + '\\n\\nTelefone tutor: ' + phone;\nreturn [{ json: { texto, phone } }];"
       },
-      "name": "Notifica Arnaldo1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
+      "name": "Prepara notificacao",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [-4160, 0],
-      "id": "6fa4b4fe-36f2-48ec-a440-2271ebbba60b"
+      "id": "prepara-notif-id-0001"
     },
     {
       "parameters": {
@@ -241,51 +227,91 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"number\": \"5543996170111\", \"textMessage\": {\"text\": {{ JSON.stringify($(\"Extrai resposta1\").first().json.resposta) }}}}",
+        "jsonBody": "={\"number\": \"554399590122\", \"textMessage\": {\"text\": {{ JSON.stringify($json.texto) }}}}",
+        "options": {}
+      },
+      "name": "Notifica Arnaldo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-3920, 0],
+      "id": "6fa4b4fe-36f2-48ec-a440-2271ebbba60b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $('Extrai resposta').first().json.resposta;\nconst phone = $('Extrai resposta').first().json.phone;\nconst texto = resposta.includes('[TRIAGEM_COMPLETA]')\n  ? 'Obrigada pelas informações! 😊 A Dra. Vanessa vai analisar o caso do seu pet e entrar em contato em breve.'\n  : resposta;\nreturn [{ json: { texto, phone } }];"
+      },
+      "name": "Prepara resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-4160, 288],
+      "id": "prepara-resposta-id-0001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evo.emcasa.vet/message/sendText/teste",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "emcasa2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"number\": \"{{ $json.phone }}\", \"textMessage\": {\"text\": {{ JSON.stringify($json.texto) }}}}",
         "options": {}
       },
       "name": "Envia resposta MIA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [-4160, 272],
+      "position": [-3920, 288],
       "id": "f582ac10-5655-4ed8-ac47-b635d3beccd5"
     }
   ],
   "connections": {
-    "Webhook Evolution1": {
+    "Webhook Evolution": {
       "main": [[{"node": "Filtro mensagem", "type": "main", "index": 0}]]
     },
     "Filtro mensagem": {
       "main": [
-        [{"node": "Extrai texto1", "type": "main", "index": 0}],
+        [{"node": "Extrai texto", "type": "main", "index": 0}],
         []
       ]
     },
-    "Extrai texto1": {
-      "main": [[{"node": "Busca histórico1", "type": "main", "index": 0}]]
+    "Extrai texto": {
+      "main": [[{"node": "Busca histórico", "type": "main", "index": 0}]]
     },
-    "Busca histórico1": {
+    "Busca histórico": {
       "main": [[{"node": "Monta contexto", "type": "main", "index": 0}]]
     },
     "Monta contexto": {
-      "main": [[{"node": "Chama Claude API1", "type": "main", "index": 0}]]
+      "main": [[{"node": "Chama Claude API", "type": "main", "index": 0}]]
     },
-    "Chama Claude API1": {
-      "main": [[{"node": "Extrai resposta1", "type": "main", "index": 0}]]
+    "Chama Claude API": {
+      "main": [[{"node": "Extrai resposta", "type": "main", "index": 0}]]
     },
-    "Extrai resposta1": {
-      "main": [[{"node": "Salva histórico1", "type": "main", "index": 0}]]
+    "Extrai resposta": {
+      "main": [[{"node": "Salva histórico", "type": "main", "index": 0}]]
     },
-    "Salva histórico1": {
-      "main": [[{"node": "Triagem completa?1", "type": "main", "index": 0}]]
+    "Salva histórico": {
+      "main": [[{"node": "Triagem completa?", "type": "main", "index": 0}]]
     },
-    "Triagem completa?1": {
+    "Triagem completa?": {
       "main": [
-        [{"node": "Notifica Arnaldo1", "type": "main", "index": 0}],
-        [{"node": "Envia resposta MIA", "type": "main", "index": 0}]
+        [{"node": "Prepara notificacao", "type": "main", "index": 0}],
+        [{"node": "Prepara resposta", "type": "main", "index": 0}]
       ]
     },
-    "Notifica Arnaldo1": {
+    "Prepara notificacao": {
+      "main": [[{"node": "Notifica Arnaldo", "type": "main", "index": 0}]]
+    },
+    "Notifica Arnaldo": {
+      "main": [[{"node": "Prepara resposta", "type": "main", "index": 0}]]
+    },
+    "Prepara resposta": {
       "main": [[{"node": "Envia resposta MIA", "type": "main", "index": 0}]]
     }
   },
@@ -293,8 +319,4 @@
     "executionOrder": "v1"
   },
   "pinData": {}
-    
 }
-
-
- 
