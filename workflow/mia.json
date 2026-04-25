@@ -121,7 +121,7 @@
           "parameters": [
             {
               "name": "x-api-key",
-              "value": "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"
+              "value": "ANTHROPIC_KEY_PLACEHOLDER"
             },
             {
               "name": "anthropic-version",
