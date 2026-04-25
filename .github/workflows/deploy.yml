@@ -1,1 +1,25 @@
+name: Deploy MIA para n8n
 
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'workflow/mia.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Envia workflow para n8n
+        run: |
+          curl -s -X PUT "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}" \
+            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d @workflow/mia.json | python3 -m json.tool | head -5
+
+      - name: Ativa workflow
+        run: |
+          curl -s -X POST "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}/activate" \
+            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" | grep -o '"active":[a-z]*'
