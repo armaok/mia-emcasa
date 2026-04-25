@@ -1,1 +1,296 @@
-
+{
+  "name": "MIA - Assistente Em Casa Vet",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mia-webhook",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook Evolution1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-6304, 144],
+      "id": "9a5a2b5b-a22a-4601-b502-c78112dd1fa1",
+      "webhookId": "cfa1780d-417d-4789-8f73-c65fbda2ee55"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-from-me",
+              "leftValue": "={{$json.body.data.key.fromMe}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "check-message-not-empty",
+              "leftValue": "={{$json.body.data.message?.conversation || $json.body.data.message?.extendedTextMessage?.text || ''}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "check-event",
+              "leftValue": "={{$json.body.event}}",
+              "rightValue": "messages.upsert",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "check-not-lid",
+              "leftValue": "={{$json.body.data.key.remoteJid}}",
+              "rightValue": "@lid",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Filtro mensagem",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-6080, 144],
+      "id": "484428ed-7b2c-4183-b797-394b94e929c2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst messageType = Object.keys(body.data.message || {})[0];\nif (!messageType || messageType === 'protocolMessage' || messageType === 'reactionMessage') { return []; }\nconst remoteJid = body.data.key.remoteJid || '';\nconst phone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '');\nconst message = body.data.message?.conversation || body.data.message?.extendedTextMessage?.text || '';\nconst instance = body.instance || 'teste';\nconst messageId = body.data.key.id || '';\nreturn [{ json: { phone, message, instance, messageId } }];"
+      },
+      "name": "Extrai texto1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-5840, 144],
+      "id": "2db9d99d-144e-41d7-a3ad-a8c9c3bd66ad"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT historico, last_message, last_message_at, last_message_id FROM conversas_mia WHERE phone = '{{ $json.phone }}' LIMIT 1",
+        "options": {}
+      },
+      "name": "Busca histórico1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [-5600, 144],
+      "id": "6fb6749a-0f79-415d-9d87-637d3628d772",
+      "credentials": {
+        "postgres": {
+          "id": "ECrybdc5FVuMK77m",
+          "name": "MIA PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const phone = $('Extrai texto1').first().json.phone;\nconst message = $('Extrai texto1').first().json.message;\nconst messageId = $('Extrai texto1').first().json.messageId || '';\nif (!message || message.trim() === '') { return []; }\nlet historico = [];\nlet lastMessage = '';\nlet lastMessageAt = null;\nlet lastMessageId = '';\ntry {\n  const rows = $('Busca histórico1').all();\n  if (rows.length > 0 && rows[0].json.historico) {\n    historico = JSON.parse(rows[0].json.historico);\n    lastMessage = rows[0].json.last_message || '';\n    lastMessageAt = rows[0].json.last_message_at ? new Date(rows[0].json.last_message_at) : null;\n    lastMessageId = rows[0].json.last_message_id || '';\n  }\n} catch(e) { historico = []; }\nif (messageId && messageId === lastMessageId) { return []; }\nconst agora = new Date();\nconst diff = lastMessageAt ? (agora - lastMessageAt) / 1000 : 999;\nif (message === lastMessage && diff < 30) { return []; }\nhistorico = historico.filter(m => m.content && m.content.trim() !== '');\nhistorico.push({ role: 'user', content: message });\nreturn [{ json: { phone, message, messageId, historico } }];"
+      },
+      "name": "Monta contexto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-5360, 144],
+      "id": "08b4349c-d6c4-4c88-9ac3-1cafa2f4df92"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "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"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 500, \"system\": \"Você é MIA, assistente virtual da Dra. Vanessa Okamura da Em Casa Vet — serviço de veterinária domiciliar em Londrina, Cambé e Ibiporã.\\n\\nSeu papel é receber tutores quando a Dra. Vanessa está em atendimento.\\n\\nTom: caloroso, empático. NÃO use markdown, NÃO use #, NÃO use **. Escreva em texto simples com emojis moderados.\\n\\nAo receber a primeira mensagem, apresente-se brevemente e pergunte o nome do tutor.\\n\\nColete em ordem, UMA pergunta por vez:\\n1. Nome do tutor\\n2. Nome do animal\\n3. Espécie (gato ou cachorro)\\n4. Idade do animal\\n5. O que está acontecendo\\n\\nQuando tiver todos os 5 dados, responda EXATAMENTE:\\n[TRIAGEM_COMPLETA]\\nTutor: {nome}\\nAnimal: {nome}\\nEspécie: {espécie}\\nIdade: {idade}\\nSituação: {resumo}\", \"messages\": {{ JSON.stringify($json.historico) }}}",
+        "options": {}
+      },
+      "name": "Chama Claude API1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-5120, 144],
+      "id": "54a783fb-1c76-4de1-b542-b29ed21c7712"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $input.first().json.content[0].text;\nconst phone = $('Monta contexto').first().json.phone;\nconst message = $('Monta contexto').first().json.message;\nconst messageId = $('Monta contexto').first().json.messageId;\nconst historico = $('Monta contexto').first().json.historico;\n\nhistorico.push({ role: 'assistant', content: resposta });\n\nreturn [{ json: { resposta, phone, message, messageId, historico } }];"
+      },
+      "name": "Extrai resposta1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-4880, 144],
+      "id": "e7af3bcb-2bcb-43ad-bef5-6b5141a4f03c"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO conversas_mia (phone, historico, last_message, last_message_id, last_message_at, updated_at) VALUES ('{{ $json.phone }}', '{{ JSON.stringify($json.historico) }}', '{{ $json.message }}', '{{ $json.messageId }}', NOW(), NOW()) ON CONFLICT (phone) DO UPDATE SET historico = EXCLUDED.historico, last_message = EXCLUDED.last_message, last_message_id = EXCLUDED.last_message_id, last_message_at = EXCLUDED.last_message_at, updated_at = NOW()",
+        "options": {}
+      },
+      "name": "Salva histórico1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [-4640, 144],
+      "id": "ebb5ba27-823b-48b9-ad45-b15b6176de7f",
+      "credentials": {
+        "postgres": {
+          "id": "ECrybdc5FVuMK77m",
+          "name": "MIA PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-triagem",
+              "leftValue": "={{ $json.resposta }}",
+              "rightValue": "[TRIAGEM_COMPLETA]",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Triagem completa?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-4400, 144],
+      "id": "ee02a851-04cb-4060-9816-94f5e5386937"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evo.emcasa.vet/message/sendText/teste",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "emcasa2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"number\": \"554399590122\", \"textMessage\": {\"text\": \"🐾 Nova triagem pela MIA:\\n\\n{{ $('Extrai resposta1').first().json.resposta.replace('[TRIAGEM_COMPLETA]', '').trim() }}\"}}",
+        "options": {}
+      },
+      "name": "Notifica Arnaldo1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-4160, 0],
+      "id": "6fa4b4fe-36f2-48ec-a440-2271ebbba60b"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evo.emcasa.vet/message/sendText/teste",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "emcasa2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"number\": \"5543996170111\", \"textMessage\": {\"text\": {{ JSON.stringify($(\"Extrai resposta1\").first().json.resposta) }}}}",
+        "options": {}
+      },
+      "name": "Envia resposta MIA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-4160, 272],
+      "id": "f582ac10-5655-4ed8-ac47-b635d3beccd5"
+    }
+  ],
+  "connections": {
+    "Webhook Evolution1": {
+      "main": [[{"node": "Filtro mensagem", "type": "main", "index": 0}]]
+    },
+    "Filtro mensagem": {
+      "main": [
+        [{"node": "Extrai texto1", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Extrai texto1": {
+      "main": [[{"node": "Busca histórico1", "type": "main", "index": 0}]]
+    },
+    "Busca histórico1": {
+      "main": [[{"node": "Monta contexto", "type": "main", "index": 0}]]
+    },
+    "Monta contexto": {
+      "main": [[{"node": "Chama Claude API1", "type": "main", "index": 0}]]
+    },
+    "Chama Claude API1": {
+      "main": [[{"node": "Extrai resposta1", "type": "main", "index": 0}]]
+    },
+    "Extrai resposta1": {
+      "main": [[{"node": "Salva histórico1", "type": "main", "index": 0}]]
+    },
+    "Salva histórico1": {
+      "main": [[{"node": "Triagem completa?1", "type": "main", "index": 0}]]
+    },
+    "Triagem completa?1": {
+      "main": [
+        [{"node": "Notifica Arnaldo1", "type": "main", "index": 0}],
+        [{"node": "Envia resposta MIA", "type": "main", "index": 0}]
+      ]
+    },
+    "Notifica Arnaldo1": {
+      "main": [[{"node": "Envia resposta MIA", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
