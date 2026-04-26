@@ -1,0 +1,61 @@
+name: Admin MIA
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Ação a executar'
+        required: true
+        type: choice
+        options:
+          - truncate_conversas
+          - backup_conversas
+          - status_servicos
+          - logs_n8n
+          - logs_evolution
+          - restart_n8n
+          - restart_evolution
+
+jobs:
+  admin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executa ação no VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            ACTION="${{ github.event.inputs.action }}"
+
+            if [ "$ACTION" = "truncate_conversas" ]; then
+              docker exec postgres_mia psql -U mia -d mia -c "TRUNCATE conversas_mia;"
+              echo "✅ Banco de conversas limpo!"
+
+            elif [ "$ACTION" = "backup_conversas" ]; then
+              ARQUIVO="backup_conversas_$(date +%Y%m%d_%H%M%S).sql"
+              docker exec postgres_mia pg_dump -U mia -d mia -t conversas_mia > /tmp/$ARQUIVO
+              echo "✅ Backup gerado: /tmp/$ARQUIVO"
+              cat /tmp/$ARQUIVO | head -20
+
+            elif [ "$ACTION" = "status_servicos" ]; then
+              echo "=== STATUS DOS CONTAINERS ==="
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            elif [ "$ACTION" = "logs_n8n" ]; then
+              echo "=== LOGS N8N (últimas 50 linhas) ==="
+              docker logs n8n --tail=50
+
+            elif [ "$ACTION" = "logs_evolution" ]; then
+              echo "=== LOGS EVOLUTION (últimas 50 linhas) ==="
+              docker logs evolution --tail=50
+
+            elif [ "$ACTION" = "restart_n8n" ]; then
+              docker restart n8n
+              echo "✅ n8n reiniciado!"
+
+            elif [ "$ACTION" = "restart_evolution" ]; then
+              docker restart evolution
+              echo "✅ Evolution reiniciada!"
+            fi
