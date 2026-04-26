@@ -15,6 +15,7 @@ on:
           - logs_evolution
           - restart_n8n
           - restart_evolution
+          - backup_configs
 
 jobs:
   admin:
@@ -58,4 +59,20 @@ jobs:
             elif [ "$ACTION" = "restart_evolution" ]; then
               docker restart evolution
               echo "✅ Evolution reiniciada!"
+
+            elif [ "$ACTION" = "backup_configs" ]; then
+              echo "=== TRAEFIK ==="
+              cat /docker/traefik/docker-compose.yml
+              echo "=== EVOLUTION ==="
+              cat /docker/evolution/docker-compose.yml
+              echo "=== N8N ==="
+              cat /docker/n8n/docker-compose.yml
+              echo "=== TYPEBOT ==="
+              cat /docker/typebot/docker-compose.yml
+              echo "=== PORTAINER ==="
+              cat /docker/portainer/docker-compose.yml
+              echo "=== UPTIME KUMA ==="
+              cat /docker/uptime-kuma/docker-compose.yml
+              echo "=== POSTGRES MIA ==="
+              cat /docker/postgres-mia/docker-compose.yml
             fi
