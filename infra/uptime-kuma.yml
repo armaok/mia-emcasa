@@ -1,0 +1,12 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime_kuma
+    restart: always
+    network_mode: host
+    environment:
+      - PORT=3001
+    volumes:
+      - uptime_data:/app/data
+volumes:
+  uptime_data:
