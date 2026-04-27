@@ -1,0 +1,16 @@
+services:
+  evolution:
+    image: atendai/evolution-api:v1.8.7
+    container_name: evolution
+    restart: always
+    network_mode: host
+    environment:
+      - SERVER_URL=https://evo.emcasa.vet
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - AUTHENTICATION_EXPOSE_IN_FETCH_CLIENTS=true
+      - PORT=8080
+    volumes:
+      - evolution_data:/evolution/instances
+volumes:
+  evolution_data:
