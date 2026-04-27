@@ -1,0 +1,15 @@
+services:
+  postgres-mia:
+    image: postgres:15
+    container_name: postgres_mia
+    restart: always
+    environment:
+      - POSTGRES_DB=mia
+      - POSTGRES_USER=mia
+      - POSTGRES_PASSWORD=${MIA_DB_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_mia_data:/var/lib/postgresql/data
+volumes:
+  postgres_mia_data:
