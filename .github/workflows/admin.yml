@@ -16,7 +16,6 @@ on:
           - restart_n8n
           - restart_evolution
           - backup_configs
-          - upload_infra
 
 jobs:
   admin:
@@ -76,36 +75,4 @@ jobs:
               cat /docker/uptime-kuma/docker-compose.yml
               echo "POSTGRES MIA"
               cat /docker/postgres-mia/docker-compose.yml
-
-            elif [ "$ACTION" = "upload_infra" ]; then
-              TOKEN="${{ secrets.GH_PAT }}"
-              REPO="armaok/mia-emcasa"
-
-              upload() {
-                FILE=$1
-                PATH_IN_REPO=$2
-                CONTENT=$(base64 -w 0 $FILE)
-                SHA=$(curl -s -H "Authorization: token $TOKEN" \
-                  "https://api.github.com/repos/$REPO/contents/$PATH_IN_REPO" \
-                  | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null)
-                if [ -z "$SHA" ]; then
-                  PAYLOAD="{\"message\":\"infra: add $PATH_IN_REPO\",\"content\":\"$CONTENT\"}"
-                else
-                  PAYLOAD="{\"message\":\"infra: update $PATH_IN_REPO\",\"content\":\"$CONTENT\",\"sha\":\"$SHA\"}"
-                fi
-                curl -s -X PUT -H "Authorization: token $TOKEN" \
-                  -H "Content-Type: application/json" \
-                  -d "$PAYLOAD" \
-                  "https://api.github.com/repos/$REPO/contents/$PATH_IN_REPO" \
-                  | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('content',{}).get('path','erro'))" 2>/dev/null
-              }
-
-              upload /docker/traefik/docker-compose.yml infra/traefik.yml
-              upload /docker/evolution/docker-compose.yml infra/evolution.yml
-              upload /docker/n8n/docker-compose.yml infra/n8n.yml
-              upload /docker/typebot/docker-compose.yml infra/typebot.yml
-              upload /docker/portainer/docker-compose.yml infra/portainer.yml
-              upload /docker/uptime-kuma/docker-compose.yml infra/uptime-kuma.yml
-              upload /docker/postgres-mia/docker-compose.yml infra/postgres-mia.yml
-              echo "Infra enviada para o GitHub!"
             fi
