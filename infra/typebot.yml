@@ -1,0 +1,32 @@
+services:
+  typebot:
+    image: baptistearno/typebot-builder:latest
+    container_name: typebot
+    restart: always
+    network_mode: host
+    environment:
+      - DATABASE_URL=postgresql://typebot:${TYPEBOT_DB_PASSWORD}@localhost:5433/typebot
+      - NEXTAUTH_URL=https://bot.emcasa.vet
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.emcasa.vet
+      - ENCRYPTION_SECRET=${TYPEBOT_ENCRYPTION_SECRET}
+      - ADMIN_EMAIL=arnaldo@emcasa.vet
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+    depends_on:
+      - typebot-db
+  typebot-db:
+    image: postgres:15
+    container_name: typebot_postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=typebot
+      - POSTGRES_USER=typebot
+      - POSTGRES_PASSWORD=${TYPEBOT_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - typebot_data:/var/lib/postgresql/data
+volumes:
+  typebot_data:
