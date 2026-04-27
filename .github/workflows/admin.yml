@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Ação a executar'
+        description: 'Acao a executar'
         required: true
         type: choice
         options:
@@ -16,12 +16,13 @@ on:
           - restart_n8n
           - restart_evolution
           - backup_configs
+          - upload_infra
 
 jobs:
   admin:
     runs-on: ubuntu-latest
     steps:
-      - name: Executa ação no VPS
+      - name: Executa acao no VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -32,47 +33,79 @@ jobs:
 
             if [ "$ACTION" = "truncate_conversas" ]; then
               docker exec postgres_mia psql -U mia -d mia -c "TRUNCATE conversas_mia;"
-              echo "✅ Banco de conversas limpo!"
+              echo "Banco de conversas limpo!"
 
             elif [ "$ACTION" = "backup_conversas" ]; then
               ARQUIVO="backup_conversas_$(date +%Y%m%d_%H%M%S).sql"
               docker exec postgres_mia pg_dump -U mia -d mia -t conversas_mia > /tmp/$ARQUIVO
-              echo "✅ Backup gerado: /tmp/$ARQUIVO"
+              echo "Backup gerado: /tmp/$ARQUIVO"
               cat /tmp/$ARQUIVO | head -20
 
             elif [ "$ACTION" = "status_servicos" ]; then
-              echo "=== STATUS DOS CONTAINERS ==="
+              echo "STATUS DOS CONTAINERS"
               docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
             elif [ "$ACTION" = "logs_n8n" ]; then
-              echo "=== LOGS N8N (últimas 50 linhas) ==="
+              echo "LOGS N8N ultimas 50 linhas"
               docker logs n8n --tail=50
 
             elif [ "$ACTION" = "logs_evolution" ]; then
-              echo "=== LOGS EVOLUTION (últimas 50 linhas) ==="
+              echo "LOGS EVOLUTION ultimas 50 linhas"
               docker logs evolution --tail=50
 
             elif [ "$ACTION" = "restart_n8n" ]; then
               docker restart n8n
-              echo "✅ n8n reiniciado!"
+              echo "n8n reiniciado!"
 
             elif [ "$ACTION" = "restart_evolution" ]; then
               docker restart evolution
-              echo "✅ Evolution reiniciada!"
+              echo "Evolution reiniciada!"
 
             elif [ "$ACTION" = "backup_configs" ]; then
-              echo "=== TRAEFIK ==="
+              echo "TRAEFIK"
               cat /docker/traefik/docker-compose.yml
-              echo "=== EVOLUTION ==="
+              echo "EVOLUTION"
               cat /docker/evolution/docker-compose.yml
-              echo "=== N8N ==="
+              echo "N8N"
               cat /docker/n8n/docker-compose.yml
-              echo "=== TYPEBOT ==="
+              echo "TYPEBOT"
               cat /docker/typebot/docker-compose.yml
-              echo "=== PORTAINER ==="
+              echo "PORTAINER"
               cat /docker/portainer/docker-compose.yml
-              echo "=== UPTIME KUMA ==="
+              echo "UPTIME KUMA"
               cat /docker/uptime-kuma/docker-compose.yml
-              echo "=== POSTGRES MIA ==="
+              echo "POSTGRES MIA"
               cat /docker/postgres-mia/docker-compose.yml
+
+            elif [ "$ACTION" = "upload_infra" ]; then
+              TOKEN="${{ secrets.GH_PAT }}"
+              REPO="armaok/mia-emcasa"
+
+              upload() {
+                FILE=$1
+                PATH_IN_REPO=$2
+                CONTENT=$(base64 -w 0 $FILE)
+                SHA=$(curl -s -H "Authorization: token $TOKEN" \
+                  "https://api.github.com/repos/$REPO/contents/$PATH_IN_REPO" \
+                  | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null)
+                if [ -z "$SHA" ]; then
+                  PAYLOAD="{\"message\":\"infra: add $PATH_IN_REPO\",\"content\":\"$CONTENT\"}"
+                else
+                  PAYLOAD="{\"message\":\"infra: update $PATH_IN_REPO\",\"content\":\"$CONTENT\",\"sha\":\"$SHA\"}"
+                fi
+                curl -s -X PUT -H "Authorization: token $TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" \
+                  "https://api.github.com/repos/$REPO/contents/$PATH_IN_REPO" \
+                  | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('content',{}).get('path','erro'))" 2>/dev/null
+              }
+
+              upload /docker/traefik/docker-compose.yml infra/traefik.yml
+              upload /docker/evolution/docker-compose.yml infra/evolution.yml
+              upload /docker/n8n/docker-compose.yml infra/n8n.yml
+              upload /docker/typebot/docker-compose.yml infra/typebot.yml
+              upload /docker/portainer/docker-compose.yml infra/portainer.yml
+              upload /docker/uptime-kuma/docker-compose.yml infra/uptime-kuma.yml
+              upload /docker/postgres-mia/docker-compose.yml infra/postgres-mia.yml
+              echo "Infra enviada para o GitHub!"
             fi
