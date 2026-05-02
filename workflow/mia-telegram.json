@@ -1,0 +1,46 @@
+name: Deploy MIA para n8n
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'workflow/*.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Injeta credenciais no workflow WhatsApp
+        run: |
+          sed -i 's/ANTHROPIC_KEY_PLACEHOLDER/${{ secrets.ANTHROPIC_API_KEY }}/g' workflow/mia.json
+
+      - name: Envia workflow WhatsApp para n8n
+        run: |
+          curl -s -X PUT "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}" \
+            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d @workflow/mia.json | python3 -m json.tool | head -5
+
+      - name: Ativa workflow WhatsApp
+        run: |
+          curl -s -X POST "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}/activate" \
+            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" | grep -o '"active":[a-z]*'
+
+      - name: Injeta credenciais no workflow Telegram
+        run: |
+          sed -i 's/ANTHROPIC_KEY_PLACEHOLDER/${{ secrets.ANTHROPIC_API_KEY }}/g' workflow/mia-telegram.json
+          sed -i 's/TELEGRAM_TOKEN_PLACEHOLDER/${{ secrets.TELEGRAM_BOT_TOKEN }}/g' workflow/mia-telegram.json
+
+      - name: Envia workflow Telegram para n8n
+        run: |
+          curl -s -X PUT "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID_TELEGRAM }}" \
+            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d @workflow/mia-telegram.json | python3 -m json.tool | head -5
+
+      - name: Ativa workflow Telegram
+        run: |
+          curl -s -X POST "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID_TELEGRAM }}/activate" \
+            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" | grep -o '"active":[a-z]*'
