@@ -27,7 +27,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const agora = new Date();\nconst hora = agora.getHours();\nconst diaSemana = agora.getDay();\nconst dentroHorario = diaSemana >= 1 && diaSemana <= 6 && hora >= 8 && hora < 18;\nreturn [{ json: { ...$input.first().json, dentroHorario } }];"
+        "jsCode": "const agora = new Date();\nconst agoraBrasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000);\nconst hora = agoraBrasilia.getUTCHours();\nconst diaSemana = agoraBrasilia.getUTCDay();\nconst dentroHorario = diaSemana >= 1 && diaSemana <= 6 && hora >= 8 && hora < 18;\nreturn [{ json: { ...$input.first().json, dentroHorario, hora, diaSemana } }];"
       },
       "name": "Verifica horario",
       "type": "n8n-nodes-base.code",
