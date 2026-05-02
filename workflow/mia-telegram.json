@@ -12,34 +12,34 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [-1600, 0],
-      "id": "telegram-webhook-001",
+      "id": "node-001",
       "webhookId": "telegram-webhook-001"
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst message = body.message || body.edited_message;\nif (!message) { return []; }\nconst chatid = String(message.chat.id);\nconst fromid = String(message.from.id);\nconst fromname = message.from.first_name || 'Sem nome';\nconst text = message.text || '';\nconst messageid = message.message_id;\nif (!text || text.trim() === '') { return []; }\nreturn [{ json: { chatid, fromid, fromname, text, messageid } }];"
+        "jsCode": "const body = $input.first().json.body;\nconst message = body.message || body.edited_message;\nif (!message) { return []; }\nconst chatid = String(message.chat.id);\nconst fromname = message.from.first_name || 'Sem nome';\nconst text = message.text || '';\nif (!text || text.trim() === '') { return []; }\nreturn [{ json: { chatid, fromname, text } }];"
       },
       "name": "Extrai mensagem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-1360, 0],
-      "id": "extrai-mensagem-001"
+      "id": "node-002"
     },
     {
       "parameters": {
-        "jsCode": "const agora = new Date();\nconst agoraBrasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000);\nconst hora = agoraBrasilia.getUTCHours();\nconst diaSemana = agoraBrasilia.getUTCDay();\nconst dentroHorario = diaSemana >= 1 && diaSemana <= 6 && hora >= 8 && hora < 18;\nreturn [{ json: { ...$input.first().json, dentroHorario, hora, diaSemana } }];"
+        "jsCode": "const agora = new Date();\nconst brasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000);\nconst hora = brasilia.getUTCHours();\nconst dia = brasilia.getUTCDay();\nconst dentroHorario = dia >= 1 && dia <= 6 && hora >= 8 && hora < 18;\nreturn [{ json: { ...$input.first().json, dentroHorario } }];"
       },
       "name": "Verifica horario",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-1120, 0],
-      "id": "verifica-horario-001"
+      "id": "node-003"
     },
     {
       "parameters": {
         "conditions": {
           "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3},
-          "conditions": [{"id": "check-horario", "leftValue": "={{ $json.dentroHorario }}", "rightValue": true, "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+          "conditions": [{"id": "c1", "leftValue": "={{ $json.dentroHorario }}", "rightValue": true, "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
           "combinator": "and"
         },
         "options": {}
@@ -48,17 +48,17 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [-880, 0],
-      "id": "dentro-horario-001"
+      "id": "node-004"
     },
     {
       "parameters": {
-        "jsCode": "const chatid = $input.first().json.chatid;\nconst fromname = $input.first().json.fromname;\nconst texto = 'Ola, ' + fromname + '!\\n\\nA Dra. Vanessa esta fora do horario de atendimento no momento.\\n\\nSe for uma urgencia, procure um servico veterinario 24 horas mais proximo.\\n\\nNos demais casos, ela retornara sua mensagem assim que possivel.';\nreturn [{ json: { chatid, texto } }];"
+        "jsCode": "const d = $input.first().json;\nconst texto = 'Ola, ' + d.fromname + '!\\n\\nA Dra. Vanessa esta fora do horario de atendimento.\\n\\nUrgencias: procure um veterinario 24 horas.\\n\\nDemais casos: ela retornara assim que possivel.';\nreturn [{ json: { chatid: d.chatid, texto } }];"
       },
       "name": "Resposta fora horario",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-640, 240],
-      "id": "resposta-fora-horario-001"
+      "id": "node-005"
     },
     {
       "parameters": {
@@ -72,79 +72,66 @@
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.3,
       "position": [-640, -120],
-      "id": "busca-evento-001",
+      "id": "node-006",
       "credentials": {"googleCalendarOAuth2Api": {"id": "hHZW471d2UWrusiE", "name": "Vanessa Google Calendar"}}
     },
     {
       "parameters": {
-        "jsCode": "const eventos = $input.all();\nconst temEvento = eventos.length > 0 && eventos[0].json.id;\nconst msg = $('Extrai mensagem').first().json;\nreturn [{ json: { chatid: msg.chatid, fromid: msg.fromid, fromname: msg.fromname, text: msg.text, vanessaOcupada: !!temEvento } }];"
+        "jsCode": "const eventos = $input.all();\nconst ocupada = eventos.length > 0 && !!eventos[0].json.id;\nconst msg = $('Extrai mensagem').first().json;\nreturn [{ json: { chatid: msg.chatid, fromname: msg.fromname, text: msg.text, ocupada } }];"
       },
-      "name": "Avalia estado Vanessa",
+      "name": "Avalia Vanessa",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-400, -120],
-      "id": "avalia-estado-001"
+      "id": "node-007"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT c.id as casoid, a.nome as animalnome, h.nome as tutornome FROM casos c JOIN animais a ON c.animal_id = a.id JOIN humanos h ON c.humano_id = h.id WHERE c.telegram_channel_id = '{{ $json.chatid }}' LIMIT 1",
-        "options": {}
-      },
-      "name": "Busca caso no Neon",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [-160, -120],
-      "id": "busca-caso-001",
-      "credentials": {"postgres": {"id": "uOqYjeak01QLTVUy", "name": "MIA Neon"}}
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT historico FROM conversas_telegram WHERE chat_id = '{{ $('Avalia estado Vanessa').first().json.chatid }}' LIMIT 1",
+        "query": "SELECT historico FROM conversas_telegram WHERE chat_id = '{{ $json.chatid }}' LIMIT 1",
         "options": {}
       },
       "name": "Busca historico",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [80, -120],
-      "id": "busca-historico-001",
+      "position": [-160, -120],
+      "id": "node-008",
       "credentials": {"postgres": {"id": "uOqYjeak01QLTVUy", "name": "MIA Neon"}}
     },
     {
       "parameters": {
-        "jsCode": "const caso = $('Busca caso no Neon').all();\nconst temCaso = caso.length > 0 && caso[0].json.casoid;\nconst estado = $('Avalia estado Vanessa').first().json;\nconst historicoRows = $('Busca historico').all();\n\nlet historico = [];\ntry {\n  if (historicoRows.length > 0 && historicoRows[0].json.historico) {\n    historico = JSON.parse(historicoRows[0].json.historico);\n  }\n} catch(e) { historico = []; }\n\nhistorico.push({ role: 'user', content: estado.text });\n\nlet situacao;\nif (!estado.vanessaOcupada) {\n  situacao = 'livre';\n} else if (temCaso) {\n  situacao = 'ocupada_caso_antigo';\n} else {\n  situacao = 'ocupada_caso_novo';\n}\n\nconst animalnome = temCaso ? caso[0].json.animalnome : null;\nconst tutornome = temCaso ? caso[0].json.tutornome : estado.fromname;\n\nreturn [{ json: { chatid: estado.chatid, fromname: estado.fromname, text: estado.text, situacao, animalnome, tutornome, historico } }];"
+        "jsCode": "const estado = $('Avalia Vanessa').first().json;\nconst rows = $('Busca historico').all();\n\nlet historico = [];\ntry {\n  if (rows.length > 0 && rows[0].json.historico) {\n    historico = JSON.parse(rows[0].json.historico);\n  }\n} catch(e) { historico = []; }\n\nhistorico.push({ role: 'user', content: estado.text });\n\nconst situacao = !estado.ocupada ? 'livre' : 'ocupada_novo';\n\nreturn [{ json: { chatid: estado.chatid, fromname: estado.fromname, text: estado.text, situacao, historico } }];"
       },
       "name": "Define situacao",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [320, -120],
-      "id": "define-situacao-001"
+      "position": [80, -120],
+      "id": "node-009"
     },
     {
       "parameters": {
         "conditions": {
           "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3},
-          "conditions": [{"id": "check-caso-novo", "leftValue": "={{ $json.situacao }}", "rightValue": "ocupada_caso_novo", "operator": {"type": "string", "operation": "equals"}}],
+          "conditions": [{"id": "c2", "leftValue": "={{ $json.situacao }}", "rightValue": "ocupada_novo", "operator": {"type": "string", "operation": "equals"}}],
           "combinator": "and"
         },
         "options": {}
       },
-      "name": "Caso novo?",
+      "name": "Ocupada e novo?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [560, -120],
-      "id": "caso-novo-001"
+      "position": [320, -120],
+      "id": "node-010"
     },
     {
       "parameters": {
-        "jsCode": "const dados = $input.first().json;\nconst chatid = dados.chatid;\nconst tutornome = dados.tutornome;\nconst animalnome = dados.animalnome;\nconst situacao = dados.situacao;\nconst historico = dados.historico;\nlet texto;\nif (situacao === 'livre') {\n  texto = 'Ola, ' + tutornome + '!\\n\\nA Dra. Vanessa esta concluindo um atendimento e retornara sua mensagem em breve.\\n\\nFique a vontade para relatar o que esta acontecendo que ela lera assim que puder.';\n} else {\n  texto = 'Ola, ' + tutornome + '!\\n\\nA Dra. Vanessa esta em atendimento no momento e retornara sua mensagem em breve.\\n\\nFique a vontade para relatar o que esta acontecendo com ' + (animalnome || 'seu animal') + ' que ela lera assim que puder.';\n}\nreturn [{ json: { chatid, texto, historico } }];"
+        "jsCode": "const d = $input.first().json;\nconst texto = 'Ola, ' + d.fromname + '!\\n\\nA Dra. Vanessa esta concluindo um atendimento e retornara em breve.\\n\\nFique a vontade para relatar o que esta acontecendo.';\nreturn [{ json: { chatid: d.chatid, texto, historico: d.historico } }];"
       },
-      "name": "Resposta caso antigo ou livre",
+      "name": "Resposta livre",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [800, 120],
-      "id": "resposta-antigo-001"
+      "position": [560, 120],
+      "id": "node-011"
     },
     {
       "parameters": {
@@ -160,46 +147,30 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 800, \"system\": \"Voce e MIA, assistente virtual da Dra. Vanessa Okamura da Em Casa Vet.\\n\\nSua tarefa e fazer a triagem de um tutor novo. Conduza uma conversa fluida e natural para coletar em ordem:\\n1. Nome do tutor (ja sabemos que se chama {{ $json.fromname }})\\n2. Nome do animal\\n3. Especie (cao ou gato)\\n4. Idade do animal\\n5. Motivo do contato\\n\\nTom caloroso e empatico. Sem markdown. Sem listas. Uma pergunta por vez.\\n\\nQuando tiver todos os dados responda EXATAMENTE:\\n[TRIAGEM_COMPLETA]\\nTutor: {nome}\\nAnimal: {nome do animal}\\nEspecie: {especie}\\nIdade: {idade}\\nSituacao: {resumo}\", \"messages\": {{ JSON.stringify($json.historico) }}}",
+        "jsonBody": "={\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 800, \"system\": \"Voce e MIA, assistente da Dra. Vanessa Okamura da Em Casa Vet.\\n\\nFaca a triagem do tutor {{ $json.fromname }}. Colete em conversa fluida:\\n1. Nome do animal\\n2. Especie (cao ou gato)\\n3. Idade\\n4. Motivo do contato\\n\\nUma pergunta por vez. Sem markdown.\\n\\nQuando tiver tudo responda EXATAMENTE:\\n[TRIAGEM_COMPLETA]\\nTutor: {nome}\\nAnimal: {nome}\\nEspecie: {especie}\\nIdade: {idade}\\nSituacao: {resumo}\", \"messages\": {{ JSON.stringify($json.historico) }}}",
         "options": {}
       },
-      "name": "Triagem caso novo",
+      "name": "Triagem",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [800, -240],
-      "id": "triagem-caso-novo-001"
+      "position": [560, -240],
+      "id": "node-012"
     },
     {
       "parameters": {
         "jsCode": "const resposta = $input.first().json.content[0].text;\nconst dados = $('Define situacao').first().json;\nconst historico = dados.historico;\nhistorico.push({ role: 'assistant', content: resposta });\nreturn [{ json: { chatid: dados.chatid, texto: resposta, historico } }];"
       },
-      "name": "Extrai resposta triagem",
+      "name": "Extrai triagem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1040, -240],
-      "id": "extrai-resposta-triagem-001"
-    },
-    {
-      "parameters": {
-        "jsCode": "const dados = $input.first().json;\nconst chatid = String(dados.chatid);\nconst texto = dados.texto;\nconst historico = dados.historico || [];\nreturn [{ json: { chatid, texto, historico } }];"
-      },
-      "name": "Prepara envio",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1280, 0],
-      "id": "prepara-envio-001"
+      "position": [800, -240],
+      "id": "node-013"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.telegram.org/botTELEGRAM_TOKEN_PLACEHOLDER/sendMessage",
         "sendBody": true,
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {"name": "Content-Type", "value": "application/json"}
-          ]
-        },
         "specifyBody": "json",
         "jsonBody": "={\"chat_id\": {{ $json.chatid }}, \"text\": {{ JSON.stringify($json.texto) }}}",
         "options": {}
@@ -207,20 +178,20 @@
       "name": "Envia resposta",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [1520, 0],
-      "id": "envia-resposta-001"
+      "position": [1040, 0],
+      "id": "node-014"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO conversas_telegram (chat_id, historico, last_message, last_message_at, updated_at) VALUES ('{{ $json.chatid }}', '{{ JSON.stringify($json.historico).replace(/'/g, \"''\") }}', '{{ $json.texto.substring(0,200).replace(/'/g, \"''\") }}', NOW(), NOW()) ON CONFLICT (chat_id) DO UPDATE SET historico = EXCLUDED.historico, last_message = EXCLUDED.last_message, last_message_at = EXCLUDED.last_message_at, updated_at = NOW()",
+        "query": "INSERT INTO conversas_telegram (chat_id, historico, last_message, last_message_at, updated_at) VALUES ('{{ $json.chatid }}', '{{ JSON.stringify($json.historico).replace(/'/g, \"''\") }}', '{{ $json.texto.substring(0,100).replace(/'/g, \"''\") }}', NOW(), NOW()) ON CONFLICT (chat_id) DO UPDATE SET historico = EXCLUDED.historico, last_message = EXCLUDED.last_message, last_message_at = EXCLUDED.last_message_at, updated_at = NOW()",
         "options": {}
       },
       "name": "Salva historico",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [1760, 0],
-      "id": "salva-historico-001",
+      "position": [1280, 0],
+      "id": "node-015",
       "credentials": {"postgres": {"id": "uOqYjeak01QLTVUy", "name": "MIA Neon"}}
     },
     {
@@ -232,26 +203,30 @@
       "name": "Resposta webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2000, 0],
-      "id": "resposta-webhook-001"
+      "position": [1520, 0],
+      "id": "node-016"
     }
   ],
   "connections": {
     "Webhook Telegram": {"main": [[{"node": "Extrai mensagem", "type": "main", "index": 0}]]},
     "Extrai mensagem": {"main": [[{"node": "Verifica horario", "type": "main", "index": 0}]]},
     "Verifica horario": {"main": [[{"node": "Dentro do horario?", "type": "main", "index": 0}]]},
-    "Dentro do horario?": {"main": [[{"node": "Busca evento atual", "type": "main", "index": 0}], [{"node": "Resposta fora horario", "type": "main", "index": 0}]]},
-    "Busca evento atual": {"main": [[{"node": "Avalia estado Vanessa", "type": "main", "index": 0}]]},
-    "Avalia estado Vanessa": {"main": [[{"node": "Busca caso no Neon", "type": "main", "index": 0}]]},
-    "Busca caso no Neon": {"main": [[{"node": "Busca historico", "type": "main", "index": 0}]]},
+    "Dentro do horario?": {"main": [
+      [{"node": "Busca evento atual", "type": "main", "index": 0}],
+      [{"node": "Resposta fora horario", "type": "main", "index": 0}]
+    ]},
+    "Busca evento atual": {"main": [[{"node": "Avalia Vanessa", "type": "main", "index": 0}]]},
+    "Avalia Vanessa": {"main": [[{"node": "Busca historico", "type": "main", "index": 0}]]},
     "Busca historico": {"main": [[{"node": "Define situacao", "type": "main", "index": 0}]]},
-    "Define situacao": {"main": [[{"node": "Caso novo?", "type": "main", "index": 0}]]},
-    "Caso novo?": {"main": [[{"node": "Triagem caso novo", "type": "main", "index": 0}], [{"node": "Resposta caso antigo ou livre", "type": "main", "index": 0}]]},
-    "Triagem caso novo": {"main": [[{"node": "Extrai resposta triagem", "type": "main", "index": 0}]]},
-    "Extrai resposta triagem": {"main": [[{"node": "Prepara envio", "type": "main", "index": 0}]]},
-    "Resposta caso antigo ou livre": {"main": [[{"node": "Prepara envio", "type": "main", "index": 0}]]},
-    "Resposta fora horario": {"main": [[{"node": "Prepara envio", "type": "main", "index": 0}]]},
-    "Prepara envio": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
+    "Define situacao": {"main": [[{"node": "Ocupada e novo?", "type": "main", "index": 0}]]},
+    "Ocupada e novo?": {"main": [
+      [{"node": "Triagem", "type": "main", "index": 0}],
+      [{"node": "Resposta livre", "type": "main", "index": 0}]
+    ]},
+    "Triagem": {"main": [[{"node": "Extrai triagem", "type": "main", "index": 0}]]},
+    "Extrai triagem": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
+    "Resposta livre": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
+    "Resposta fora horario": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
     "Envia resposta": {"main": [[{"node": "Salva historico", "type": "main", "index": 0}]]},
     "Salva historico": {"main": [[{"node": "Resposta webhook", "type": "main", "index": 0}]]}
   },
