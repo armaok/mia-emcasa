@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS conversas_mia (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS conversas_telegram (
+  chat_id TEXT PRIMARY KEY,
+  historico TEXT,
+  last_message TEXT,
+  last_message_at TIMESTAMP,
+  caso_id UUID REFERENCES casos(id),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS prontuarios (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   caso_id UUID NOT NULL REFERENCES casos(id),
@@ -150,5 +159,6 @@ CREATE INDEX IF NOT EXISTS idx_documentos_caso ON documentos(caso_id);
 CREATE INDEX IF NOT EXISTS idx_financeiro_caso ON financeiro(caso_id);
 CREATE INDEX IF NOT EXISTS idx_correcoes_incorporado ON correcoes_mia(incorporado);
 CREATE INDEX IF NOT EXISTS idx_mia_decisions_caso ON mia_decisions(caso_id);
+CREATE INDEX IF NOT EXISTS idx_conversas_telegram_chat ON conversas_telegram(chat_id);
 CREATE INDEX IF NOT EXISTS idx_prontuarios_embedding ON prontuarios USING ivfflat (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_documentos_embedding ON documentos USING ivfflat (embedding vector_cosine_ops);
