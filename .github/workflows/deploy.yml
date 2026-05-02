@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'workflow/*.json'
+      - 'prompts/*.md'
   workflow_dispatch:
 
 jobs:
@@ -13,9 +14,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepara system prompt
+        run: |
+          PROMPT=$(cat prompts/mia-system.md | python3 -c "
+          import sys, json
+          content = sys.stdin.read()
+          print(json.dumps(content))
+          ")
+          echo "SYSTEM_PROMPT=$PROMPT" >> $GITHUB_ENV
+
       - name: Injeta credenciais no workflow WhatsApp
         run: |
           sed -i 's/ANTHROPIC_KEY_PLACEHOLDER/${{ secrets.ANTHROPIC_API_KEY }}/g' workflow/mia.json
+          python3 - << 'EOF'
+          import json, os
+          with open('workflow/mia.json') as f:
+              wf = json.load(f)
+          prompt = os.environ['SYSTEM_PROMPT']
+          for node in wf['nodes']:
+              if node['name'] == 'Chama Claude API':
+                  body = json.loads(node['parameters']['jsonBody'].lstrip('=').replace('{{ JSON.stringify($json.historico) }}', '"__HISTORICO__"'))
+                  body['system'] = json.loads(prompt)
+                  new_body = json.dumps(body).replace('"__HISTORICO__"', '{{ JSON.stringify($json.historico) }}')
+                  node['parameters']['jsonBody'] = '=' + new_body
+                  print("System prompt injetado no WhatsApp")
+          with open('workflow/mia.json', 'w') as f:
+              json.dump(wf, f)
+          EOF
 
       - name: Envia workflow WhatsApp para n8n
         run: |
