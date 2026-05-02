@@ -1,46 +1,119 @@
-name: Deploy MIA para n8n
-
-on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'workflow/*.json'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Injeta credenciais no workflow WhatsApp
-        run: |
-          sed -i 's/ANTHROPIC_KEY_PLACEHOLDER/${{ secrets.ANTHROPIC_API_KEY }}/g' workflow/mia.json
-
-      - name: Envia workflow WhatsApp para n8n
-        run: |
-          curl -s -X PUT "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}" \
-            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d @workflow/mia.json | python3 -m json.tool | head -5
-
-      - name: Ativa workflow WhatsApp
-        run: |
-          curl -s -X POST "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID }}/activate" \
-            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" | grep -o '"active":[a-z]*'
-
-      - name: Injeta credenciais no workflow Telegram
-        run: |
-          sed -i 's/ANTHROPIC_KEY_PLACEHOLDER/${{ secrets.ANTHROPIC_API_KEY }}/g' workflow/mia-telegram.json
-          sed -i 's/TELEGRAM_TOKEN_PLACEHOLDER/${{ secrets.TELEGRAM_BOT_TOKEN }}/g' workflow/mia-telegram.json
-
-      - name: Envia workflow Telegram para n8n
-        run: |
-          curl -s -X PUT "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID_TELEGRAM }}" \
-            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d @workflow/mia-telegram.json | python3 -m json.tool | head -5
-
-      - name: Ativa workflow Telegram
-        run: |
-          curl -s -X POST "https://n8n.emcasa.vet/api/v1/workflows/${{ secrets.N8N_WORKFLOW_ID_TELEGRAM }}/activate" \
-            -H "X-N8N-API-KEY: ${{ secrets.N8N_API_KEY }}" | grep -o '"active":[a-z]*'
+{
+  "name": "MIA Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook Telegram",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-1200, 0],
+      "id": "telegram-webhook-001",
+      "webhookId": "telegram-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst message = body.message || body.edited_message;\nif (!message) { return []; }\nconst chat_id = message.chat.id;\nconst from_id = message.from.id;\nconst from_name = message.from.first_name || 'Sem nome';\nconst text = message.text || '';\nconst message_id = message.message_id;\nif (!text || text.trim() === '') { return []; }\nreturn [{ json: { chat_id, from_id, from_name, text, message_id } }];"
+      },
+      "name": "Extrai mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 0],
+      "id": "extrai-mensagem-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "ANTHROPIC_KEY_PLACEHOLDER"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 500, \"system\": \"Voce e MIA, assistente da Dra. Vanessa Okamura da Em Casa Vet. Responda de forma breve e util.\", \"messages\": [{\"role\": \"user\", \"content\": {{ JSON.stringify($json.text) }}}]}",
+        "options": {}
+      },
+      "name": "Chama Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-720, 0],
+      "id": "chama-claude-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $input.first().json.content[0].text;\nconst chat_id = $('Extrai mensagem').first().json.chat_id;\nreturn [{ json: { chat_id, resposta } }];"
+      },
+      "name": "Extrai resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0],
+      "id": "extrai-resposta-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botTELEGRAM_TOKEN_PLACEHOLDER/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"chat_id\": {{ $json.chat_id }}, \"text\": {{ JSON.stringify($json.resposta) }}}",
+        "options": {}
+      },
+      "name": "Responde Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-240, 0],
+      "id": "responde-telegram-001"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\": true}",
+        "options": {}
+      },
+      "name": "Resposta webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "resposta-webhook-001"
+    }
+  ],
+  "connections": {
+    "Webhook Telegram": {
+      "main": [[{"node": "Extrai mensagem", "type": "main", "index": 0}]]
+    },
+    "Extrai mensagem": {
+      "main": [[{"node": "Chama Claude", "type": "main", "index": 0}]]
+    },
+    "Chama Claude": {
+      "main": [[{"node": "Extrai resposta", "type": "main", "index": 0}]]
+    },
+    "Extrai resposta": {
+      "main": [[{"node": "Responde Telegram", "type": "main", "index": 0}]]
+    },
+    "Responde Telegram": {
+      "main": [[{"node": "Resposta webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
