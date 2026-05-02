@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - truncate_conversas
+          - truncate_telegram
           - backup_conversas
           - status_servicos
           - logs_n8n
@@ -32,7 +33,11 @@ jobs:
 
             if [ "$ACTION" = "truncate_conversas" ]; then
               docker exec postgres_mia psql -U mia -d mia -c "TRUNCATE conversas_mia;"
-              echo "Banco de conversas limpo!"
+              echo "Banco de conversas WhatsApp limpo!"
+
+            elif [ "$ACTION" = "truncate_telegram" ]; then
+              PGPASSWORD=npg_xERdb4rjLDJ6 psql "postgresql://neondb_owner@ep-damp-truth-ace0yru9-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require" -c "DELETE FROM conversas_telegram;"
+              echo "Historico Telegram limpo!"
 
             elif [ "$ACTION" = "backup_conversas" ]; then
               ARQUIVO="backup_conversas_$(date +%Y%m%d_%H%M%S).sql"
