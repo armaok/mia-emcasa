@@ -36,8 +36,8 @@ jobs:
               echo "Banco de conversas WhatsApp limpo!"
 
             elif [ "$ACTION" = "truncate_telegram" ]; then
-  docker exec postgres_mia psql "postgresql://neondb_owner:npg_xERdb4rjLDJ6@ep-damp-truth-ace0yru9-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require" -c "DELETE FROM conversas_telegram;"
-  echo "Historico Telegram limpo!"
+              docker exec postgres_mia psql "postgresql://neondb_owner:npg_xERdb4rjLDJ6@ep-damp-truth-ace0yru9-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require" -c "DELETE FROM conversas_telegram;"
+              echo "Historico Telegram limpo!"
 
             elif [ "$ACTION" = "backup_conversas" ]; then
               ARQUIVO="backup_conversas_$(date +%Y%m%d_%H%M%S).sql"
