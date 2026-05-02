@@ -1,21 +1,7 @@
-name: Migrate Neon Database
+-- ============================================
+-- SCHEMA MIA - Em Casa Vet
+-- ============================================
 
-on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'db/schema.sql'
-
-jobs:
-  migrate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Instala cliente PostgreSQL
-        run: sudo apt-get install -y postgresql-client
-
-      - name: Executa migration no Neon
-        run: |
-          psql "${{ secrets.NEON_DATABASE_URL }}" -f db/schema.sql
-          echo "Migration concluida!"
+-- Extensões necessárias
+CREATE EXTENSION IF NOT EXISTS vector;
+...
