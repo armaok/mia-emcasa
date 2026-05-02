@@ -101,7 +101,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT historico FROM conversas_telegram WHERE chat_id = '{{ $('Avalia estado Vanessa').first().json.chat_id }}' LIMIT 1",
+        "query": "SELECT historico FROM conversas_telegram WHERE chat_id = '{{ $json.chat_id }}' LIMIT 1",
         "options": {}
       },
       "name": "Busca historico",
@@ -232,4 +232,12 @@
     "Define situacao": {"main": [[{"node": "Caso novo?", "type": "main", "index": 0}]]},
     "Caso novo?": {"main": [[{"node": "Triagem caso novo", "type": "main", "index": 0}], [{"node": "Resposta caso antigo ou livre", "type": "main", "index": 0}]]},
     "Triagem caso novo": {"main": [[{"node": "Extrai resposta triagem", "type": "main", "index": 0}]]},
-    "Extrai resposta triagem": {"main": [[{
+    "Extrai resposta triagem": {"main": [[{"node": "Salva historico", "type": "main", "index": 0}]]},
+    "Resposta caso antigo ou livre": {"main": [[{"node": "Salva historico", "type": "main", "index": 0}]]},
+    "Resposta fora horario": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
+    "Salva historico": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
+    "Envia resposta": {"main": [[{"node": "Resposta webhook", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "pinData": {}
+}
