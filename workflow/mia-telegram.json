@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst message = body.message || body.edited_message;\nif (!message) { return []; }\nconst chat_id = message.chat.id;\nconst from_id = message.from.id;\nconst from_name = message.from.first_name || 'Sem nome';\nconst text = message.text || '';\nconst message_id = message.message_id;\nif (!text || text.trim() === '') { return []; }\nreturn [{ json: { chat_id, from_id, from_name, text, message_id } }];"
+        "jsCode": "const body = $input.first().json.body;\nconst message = body.message || body.edited_message;\nif (!message) { return []; }\nconst chat_id = String(message.chat.id);\nconst from_id = String(message.from.id);\nconst from_name = message.from.first_name || 'Sem nome';\nconst text = message.text || '';\nconst message_id = message.message_id;\nif (!text || text.trim() === '') { return []; }\nreturn [{ json: { chat_id, from_id, from_name, text, message_id } }];"
       },
       "name": "Extrai mensagem",
       "type": "n8n-nodes-base.code",
@@ -77,7 +77,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const eventos = $input.all();\nconst temEvento = eventos.length > 0 && eventos[0].json.id;\nconst chat_id = $('Extrai mensagem').first().json.chat_id;\nconst from_id = $('Extrai mensagem').first().json.from_id;\nconst from_name = $('Extrai mensagem').first().json.from_name;\nconst text = $('Extrai mensagem').first().json.text;\nreturn [{ json: { chat_id, from_id, from_name, text, vanessaOcupada: temEvento } }];"
+        "jsCode": "const eventos = $input.all();\nconst temEvento = eventos.length > 0 && eventos[0].json.id;\nconst msg = $('Extrai mensagem').first().json;\nreturn [{ json: { chat_id: msg.chat_id, from_id: msg.from_id, from_name: msg.from_name, text: msg.text, vanessaOcupada: !!temEvento } }];"
       },
       "name": "Avalia estado Vanessa",
       "type": "n8n-nodes-base.code",
@@ -101,7 +101,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT historico FROM conversas_telegram WHERE chat_id = '{{ $json.chat_id }}' LIMIT 1",
+        "query": "SELECT historico FROM conversas_telegram WHERE chat_id = '{{ $('Avalia estado Vanessa').first().json.chat_id }}' LIMIT 1",
         "options": {}
       },
       "name": "Busca historico",
@@ -182,7 +182,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO conversas_telegram (chat_id, historico, last_message, last_message_at, updated_at) VALUES ('{{ $json.chat_id }}', '{{ JSON.stringify($json.historico) }}', '{{ $json.texto }}', NOW(), NOW()) ON CONFLICT (chat_id) DO UPDATE SET historico = EXCLUDED.historico, last_message = EXCLUDED.last_message, last_message_at = EXCLUDED.last_message_at, updated_at = NOW()",
+        "query": "INSERT INTO conversas_telegram (chat_id, historico, last_message, last_message_at, updated_at) VALUES ('{{ $json.chat_id }}', '{{ JSON.stringify($json.historico).replace(/'/g, \"''\") }}', '{{ $json.texto.replace(/'/g, \"''\") }}', NOW(), NOW()) ON CONFLICT (chat_id) DO UPDATE SET historico = EXCLUDED.historico, last_message = EXCLUDED.last_message, last_message_at = EXCLUDED.last_message_at, updated_at = NOW()",
         "options": {}
       },
       "name": "Salva historico",
@@ -191,6 +191,16 @@
       "position": [1280, 0],
       "id": "salva-historico-001",
       "credentials": {"postgres": {"id": "uOqYjeak01QLTVUy", "name": "MIA Neon"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $input.first().json;\nreturn [{ json: { chat_id: String(dados.chat_id), texto: dados.texto } }];"
+      },
+      "name": "Prepara envio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 0],
+      "id": "prepara-envio-001"
     },
     {
       "parameters": {
@@ -204,7 +214,7 @@
       "name": "Envia resposta",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [1520, 0],
+      "position": [1760, 0],
       "id": "envia-resposta-001"
     },
     {
@@ -216,7 +226,7 @@
       "name": "Resposta webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1760, 0],
+      "position": [2000, 0],
       "id": "resposta-webhook-001"
     }
   ],
@@ -234,8 +244,9 @@
     "Triagem caso novo": {"main": [[{"node": "Extrai resposta triagem", "type": "main", "index": 0}]]},
     "Extrai resposta triagem": {"main": [[{"node": "Salva historico", "type": "main", "index": 0}]]},
     "Resposta caso antigo ou livre": {"main": [[{"node": "Salva historico", "type": "main", "index": 0}]]},
-    "Resposta fora horario": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
-    "Salva historico": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
+    "Resposta fora horario": {"main": [[{"node": "Prepara envio", "type": "main", "index": 0}]]},
+    "Salva historico": {"main": [[{"node": "Prepara envio", "type": "main", "index": 0}]]},
+    "Prepara envio": {"main": [[{"node": "Envia resposta", "type": "main", "index": 0}]]},
     "Envia resposta": {"main": [[{"node": "Resposta webhook", "type": "main", "index": 0}]]}
   },
   "settings": {"executionOrder": "v1"},
